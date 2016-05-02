@@ -1,5 +1,5 @@
 ﻿[DSCLocalConfigurationManager()]
-configuration PullClientConfigIDSQL
+configuration PullClientConfigIDNano
 {
 param
 (
@@ -22,25 +22,27 @@ param
         {
             ServerURL = 'http://' + $PullServer + ':8080/PSDSCPullServer.svc'
             RegistrationKey = $Registrationkey
-            ConfigurationNames = @('SQLConfig')
-            AllowUnsecureConnection = $True
+            ConfigurationNames = @('NanoConfig')
+            AllowUnSecureConnection = $True
         }
-       
+   
         ResourceRepositoryWeb PullServerResourceSrv
         {
             ServerURL = 'http://' + $PullServer + ':8080/PSDSCPullServer.svc'
             RegistrationKey = $Registrationkey
-            AllowUnsecureConnection = $True
+            AllowUnSecureConnection = $True
         }
 
         ReportServerWeb PullServerReportSrv
         {
             ServerURL = 'http://' + $PullServer + ':8080/PSDSCPullServer.svc'
             RegistrationKey = $Registrationkey
-            AllowUnsecureConnection = $True
+            AllowUnSecureConnection = $True
         }
     }
 }
+
 ## If on localhost uncomment this line
 
-## PullClientConfigIDSQL -Registrationkey 8f4c3893-50b2-4f13-8c20-236db525a01f -ComputerName localhost -PullServer PullServer -OutputPath c:\temp\SQLLCM -Verbose
+PullClientConfigIDNano -Registrationkey 8f4c3893-50b2-4f13-8c20-236db525a01f -ComputerName localhost -PullServer PullServer -OutputPath c:\temp\NanoLCM -Verbose
+Set-DscLocalConfigurationManager -Path c:\temp\NanoLCM

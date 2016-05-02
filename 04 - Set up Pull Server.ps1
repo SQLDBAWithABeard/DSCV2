@@ -19,7 +19,8 @@ configuration PullServer
      ) 
 
 
-     Import-DSCResource -ModuleName PSDesiredStateConfiguration , xPSDesiredStateConfiguration
+     Import-DSCResource -ModuleName PSDesiredStateConfiguration -ModuleVersion '1.1'
+     Import-DscResource -ModuleName xPSDesiredStateConfiguration -ModuleVersion '3.9.0.0'
 
      Node $NodeName 
      { 
@@ -49,6 +50,7 @@ configuration PullServer
             Type            = 'File'
             DestinationPath = "$env:ProgramFiles\WindowsPowerShell\DscService\RegistrationKeys.txt"
             Contents        = $RegistrationKey
+            DependsOn       = "[WindowsFeature]DSCServiceFeature" 
         }
     }
 }
