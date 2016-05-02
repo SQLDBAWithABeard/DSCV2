@@ -9,14 +9,15 @@ Get-Command -Module NanoServerImageGenerator
 Get-Help New-NanoServerImage -ShowWindow 
 get-help New-NanoServerImage -Examples
 
-$Nano = 'Nano'
-$IP = '10.1.0.' 
+Measure-Command {
+$Nanobase = 'Nano'
+$IPbase = '10.1.0.' 
 $x = 5
-while ($x -gt 1)
+while ($x -gt 0)
 {
     # create Nano server image VHDX
-    $Nano = $Nano + 1
-    $Ip = $IP + 1
+    $Nano = $Nanobase + $x
+    $Ip = $IPbase + $x
 New-NanoServerImage -MediaPath D:\InstallShare\Server2016TP5 -DeploymentType Guest -Edition Standard -TargetPath D:\VMs\Nano\$Nano.vhdx `
 -ComputerName $Nano -AdministratorPassword (Import-Clixml D:\creds\LocalAdmin.xml).Password -EnableRemoteManagementPort  `
  -Ipv4Address $IP -Ipv4SubnetMask '255.0.0.0' -Ipv4Gateway '10.0.0.1'  -Ipv4Dns '10.0.0.1' -InterfaceNameOrIndex Ethernet `
@@ -27,8 +28,9 @@ New-VM -Name $Nano -VHDPath D:\VMs\Nano\$Nano.vhdx -SwitchName (Get-VMSwitch).Na
 
 # Start the VM
 Start-VM -Name $Nano
+$x--
 }
-
+}
 
 $cred = New-Object System.Management.Automation.PSCredential "$Nano\Administrator", (Import-Clixml D:\creds\LocalAdmin.xml).Password
 # Connect to the VM

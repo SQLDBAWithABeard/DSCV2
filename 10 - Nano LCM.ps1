@@ -44,5 +44,5 @@ param
 
 ## If on localhost uncomment this line
 
-PullClientConfigIDNano -Registrationkey 8f4c3893-50b2-4f13-8c20-236db525a01f -ComputerName localhost -PullServer PullServer -OutputPath c:\temp\NanoLCM -Verbose
-Set-DscLocalConfigurationManager -Path c:\temp\NanoLCM
+# PullClientConfigIDNano -Registrationkey 8f4c3893-50b2-4f13-8c20-236db525a01f -ComputerName localhost -PullServer PullServer -OutputPath c:\temp\NanoLCM -Verbose
+# Set-DscLocalConfigurationManager -Path c:\temp\NanoLCM
