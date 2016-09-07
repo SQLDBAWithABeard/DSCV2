@@ -1,0 +1,375 @@
+     Script CreateAGDatabase {
+
+            GetScript  = {    return @{
+                    GetScript = $GetScript
+                    SetScript = $SetScript
+                    TestScript = $TestScript
+                    Result = ""
+                    }
+                }
+            SetScript  = {
+
+[void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.Management.Common" );
+[void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.SmoEnum" );
+[void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.Smo" );
+[void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.SmoExtended " );
+[void][System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.ConnectionInfo") 
+[String]$Server = $Using:Node.SqlServerInstance
+[String]$DBName = $Using:Node.AGDatabase
+[int]$SysFileSize = 5
+[int]$UserFileSize = 25
+[int]$LogFileSize = 25
+[int]$UserFileGrowth = 5
+[int]$UserFileMaxSize =100
+[int]$LogFileGrowth = 5
+[int]$LogFileMaxSize = 100
+[String]$DBRecModel = 'FULL'
+
+
+    # Set server object
+    $srv = New-Object ('Microsoft.SqlServer.Management.SMO.Server') $server
+    $DB = $srv.Databases[$DBName]
+    
+    # Define the variables
+    # Set the file sizes (sizes are in KB, so multiply here to MB)
+    $SysFileSize = [double]($SysFileSize * 1024.0)
+    $UserFileSize = [double] ($UserFileSize * 1024.0)
+    $LogFileSize = [double] ($LogFileSize * 1024.0)
+    $UserFileGrowth = [double] ($UserFileGrowth * 1024.0)
+    $UserFileMaxSize = [double] ($UserFileMaxSize * 1024.0)
+    $LogFileGrowth = [double] ($LogFileGrowth * 1024.0)
+    $LogFileMaxSize = [double] ($LogFileMaxSize * 1024.0)
+ 
+    # Set the Default File Locations
+    $DefaultDataLoc = $srv.Settings.DefaultFile
+    $DefaultLogLoc = $srv.Settings.DefaultLog
+ 
+    # If these are not set, then use the location of the master db mdf/ldf
+    if ($DefaultDataLoc.Length -EQ 0) {$DefaultDataLoc = $srv.Information.MasterDBPath}
+    if ($DefaultLogLoc.Length -EQ 0) {$DefaultLogLoc = $srv.Information.MasterDBLogPath}
+ 
+    # new database object
+    $DB = New-Object ('Microsoft.SqlServer.Management.SMO.Database') ($srv, $DBName)
+ 
+    # new filegroup object
+    $PrimaryFG = New-Object ('Microsoft.SqlServer.Management.SMO.FileGroup') ($DB, 'PRIMARY')
+    # Add the filegroup object to the database object
+    $DB.FileGroups.Add($PrimaryFG )
+ 
+    # Best practice is to separate the system objects from the user objects.
+    # So create a seperate User File Group
+    $UserFG= New-Object ('Microsoft.SqlServer.Management.SMO.FileGroup') ($DB, 'UserFG')
+    $DB.FileGroups.Add($UserFG)
+ 
+    # Create the database files
+    # First, create a data file on the primary filegroup.
+    $SystemFileName = $DBName + "_System"
+    $SysFile = New-Object ('Microsoft.SqlServer.Management.SMO.DataFile') ($PrimaryFG , $SystemFileName)
+    $PrimaryFG.Files.Add($SysFile)
+    $SysFile.FileName = $DefaultDataLoc + $SystemFileName + ".MDF"
+    $SysFile.Size = $SysFileSize
+    $SysFile.GrowthType = "None"
+    $SysFile.IsPrimaryFile = 'True'
+ 
+    # Now create the data file for the user objects
+    $UserFileName = $DBName + "_User"
+    $UserFile = New-Object ('Microsoft.SqlServer.Management.SMO.Datafile') ($UserFG, $UserFileName)
+    $UserFG.Files.Add($UserFile)
+    $UserFile.FileName = $DefaultDataLoc + $UserFileName + ".NDF"
+    $UserFile.Size = $UserFileSize
+    $UserFile.GrowthType = "KB"
+    $UserFile.Growth = $UserFileGrowth
+    $UserFile.MaxSize = $UserFileMaxSize
+ 
+    # Create a log file for this database
+    $LogFileName = $DBName + "_Log"
+    $LogFile = New-Object ('Microsoft.SqlServer.Management.SMO.LogFile') ($DB, $LogFileName)
+    $DB.LogFiles.Add($LogFile)
+    $LogFile.FileName = $DefaultLogLoc + $LogFileName + ".LDF"
+    $LogFile.Size = $LogFileSize
+    $LogFile.GrowthType = "KB"
+    $LogFile.Growth = $LogFileGrowth
+    $LogFile.MaxSize = $LogFileMaxSize
+ 
+    #Set the Recovery Model
+    $DB.RecoveryModel = $DBRecModel
+    #Create the database
+    $DB.Create()
+ 
+    #Make the user filegroup the default
+    $UserFG = $DB.FileGroups['UserFG']
+    $UserFG.IsDefault = $true
+    $UserFG.Alter()
+    $DB.Alter()
+            
+              }
+            TestScript = { 
+            [void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.Management.Common" );
+            [void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.SmoEnum" );
+            [void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.Smo" );
+            [void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.SmoExtended " );
+            [void][System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.ConnectionInfo") 
+            [String]$Server = $Using:Node.SqlServerInstance
+            [String]$DBName = $Using:Node.AGDatabase
+            $srv = New-Object ('Microsoft.SqlServer.Management.SMO.Server') $server
+            if($srv.Databases[$DBName])
+            {
+            Return $True
+            }
+            else
+            {
+            Return $False
+            }
+ }
+
+        }
+
+       Script CreateAG {
+        GetScript = {
+            return @{
+                    GetScript = $GetScript
+                    SetScript = $SetScript
+                    TestScript = $TestScript
+                    Result = ""
+                    }
+        }
+        SetScript = {
+[void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.Management.Common" );
+[void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.SmoEnum" );
+[void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.Smo" );
+[void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.SmoExtended " );
+[void][System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.ConnectionInfo") 
+[string]$PrimaryInstance = $Using:Node.SqlServerInstance
+[string]$SecondaryInstance = $Using:Node.Node2Name
+[string]$TertiaryInstance = $Using:Node.Node3Name
+[string]$DBName = $Using:Node.AGDatabase
+[string]$BackupShare = $Using:Node.BackupShare
+[string]$EndPort = $Using:Node.ListenerPort
+[string]$AGName = $Using:Node.AvailabilityGroup
+[string]$EPName = $Using:Node.EndpointName
+[string]$ListIPSubnet = $Using:Node.ListenerIP
+[int]$ListPort = '1433'
+[string]$ListenerName = $Using:Node.ListenerName
+
+
+################################################################################
+#          SHOULD BE NO NEED TO CHANGE ANYTHING BELOW HERE  
+#                      Rob Sewell http://sqldbawithabeard.com                   
+################################################################################
+
+$PriSrv = New-Object Microsoft.SQLServer.Management.SMO.Server $PrimaryInstance
+$SecSrv = New-Object Microsoft.SQLServer.Management.SMO.Server $SecondaryInstance
+$TerSrv = New-Object Microsoft.SQLServer.Management.SMO.Server $TertiaryInstance
+$PriFQDN = $PriSrv.Information.FullyQualifiedNetName
+$SecFQDN = $SecSrv.Information.FullyQualifiedNetName
+$TerFQDN = $TerSrv.Information.FullyQualifiedNetName
+$PriEndpointURL = 'TCP://' + $PriFQDN + ':' + $EndPort
+$SecEndpointURL = 'TCP://' + $SecFQDN + ':' + $EndPort
+$TerEndpointURL = 'TCP://' + $TerFQDN + ':' + $EndPort
+
+$PriPath = 'SQLSERVER:\SQL\' + $PrimaryInstance + '\DEFAULT'
+$SecPath = 'SQLSERVER:\SQL\' + $SecondarYInstance + '\DEFAULT'
+$TerPath = 'SQLSERVER:\SQL\' + $TertiaryInstance + '\DEFAULT'
+$PriAGPath = $PriPath + '\AvailabilityGroups\' + $AgName
+$SecAGPath = $SecPath + '\AvailabilityGroups\' + $AgName
+$terAGPath = $terPath + '\AvailabilityGroups\' + $AgName
+$LogBackupFile = $BackupShare + $DBName + '.trn'
+$FullBackupFile = $BackupShare + $DBName + '.bak' 
+
+
+
+# Backup my database and its log on the primary
+Backup-SqlDatabase -Database $DBName -BackupFile $FullBackupFile -ServerInstance $PrimaryInstance -ErrorAction Stop
+Backup-SqlDatabase -Database $DBName -BackupFile $LogBackupFile  -ServerInstance $PrimaryInstance -BackupAction Log -ErrorAction Stop 
+
+# Restore the database and log on the secondary (using NO RECOVERY)
+Restore-SqlDatabase -Database $DBName -BackupFile $FullBackupFile -ServerInstance $SecondaryInstance -NoRecovery -ErrorAction Stop
+Restore-SqlDatabase -Database $DBName -BackupFile $LogBackupFile  -ServerInstance $SecondaryInstance -RestoreAction Log -NoRecovery -ErrorAction Stop
+
+if(!($PriSrv.Endpoints|Where-Object {$_.Name -eq $EPName}))
+{
+
+# Create the endpoint.
+$endpoint = New-SqlHadrEndpoint $EPName -Port 5022 -Path $PriPath -ErrorAction Stop
+# Start the endpoint
+Set-SqlHadrEndpoint -InputObject $endpoint -State "Started" -ErrorAction Stop
+}
+else
+{
+}
+
+if(!($SecSrv.Endpoints|Where-Object {$_.Name -eq $EPName}))
+{
+$endpoint = New-SqlHadrEndpoint $EPName -Port 5022 -Path $SecPath -ErrorAction Stop
+# Start the endpoint
+Set-SqlHadrEndpoint -InputObject $endpoint -State "Started"  -ErrorAction Stop
+}
+else
+{
+}
+if(!($TerSrv.Endpoints|Where-Object {$_.Name -eq $EPName}))
+{
+$endpoint = New-SqlHadrEndpoint $EPName -Port 5022 -Path $TerPath -ErrorAction Stop
+# Start the endpoint
+Set-SqlHadrEndpoint -InputObject $endpoint -State "Started"  -ErrorAction Stop
+}
+else
+{
+}
+
+$Query = "IF NOT EXISTS (select name from sys.syslogins where name = '$ServiceAccount') CREATE LOGIN [$ServiceAccount] FROM WINDOWS; GRANT CONNECT ON EndPoint::$EPName TO [$ServiceAccount];"
+Invoke-Sqlcmd -ServerInstance $PrimaryInstance -Database master -Query $Query  -ErrorAction Stop
+Invoke-Sqlcmd -ServerInstance $SecondaryInstance -Database master -Query $Query  -ErrorAction Stop
+Invoke-Sqlcmd -ServerInstance $TertiaryInstance -Database master -Query $Query  -ErrorAction Stop
+
+# Create an in-memory representation of the primary replica.
+$PrimaryReplica = New-SqlAvailabilityReplica -Name $PrimaryInstance -EndpointURL $PriEndpointURL -AvailabilityMode "SynchronousCommit" -FailoverMode "Automatic" -Version 11 -AsTemplate -ErrorAction Stop
+# Create an in-memory representation of the secondary replica.
+$SecondaryReplica = New-SqlAvailabilityReplica -Name $SecondaryInstance -EndpointURL $SecEndpointURL -AvailabilityMode "SynchronousCommit" -FailoverMode "Automatic" -Version 11 -AsTemplate -ErrorAction Stop
+# Create an in-memory representation of the secondary replica.
+$TertiaryReplica = New-SqlAvailabilityReplica -Name $TertiaryInstance -EndpointURL $TerEndpointURL -AvailabilityMode "SynchronousCommit" -FailoverMode "Automatic" -Version 11 -AsTemplate -ErrorAction Stop
+
+New-SqlAvailabilityGroup -Name $AGName -Path $PriPath -AvailabilityReplica @($PrimaryReplica,$SecondaryReplica,$TertiaryReplica) -Database $DBName -ErrorAction Stop
+
+# Join the secondary replica to the availability group.
+Join-SqlAvailabilityGroup -Path $SecPath -Name $AGName -ErrorAction Stop
+Join-SqlAvailabilityGroup -Path $terPath -Name $AGName -ErrorAction Stop
+
+# Join the secondary database to the availability group.
+Add-SqlAvailabilityDatabase -Path $SecAGPath -Database $DBName -ErrorAction Stop
+Add-SqlAvailabilityDatabase -Path $terAGPath -Database $DBName -ErrorAction Stop
+
+New-SqlAvailabilityGroupListener -Name $ListenerName -StaticIp $ListIPSubnet -Path $PriAGPath -Port $ListPort 
+
+
+        
+        }
+        TestScript = {
+        [void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.Management.Common" );
+            [void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.SmoEnum" );
+            [void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.Smo" );
+            [void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.SmoExtended " );
+            [void][System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.ConnectionInfo") 
+            [String]$Server = $Using:Node.SqlServerInstance
+            [string]$AGName = $Using:Node.AvailabilityGroup
+            [String]$DBName = $Using:Node.AGDatabase
+            $Result = $True
+            $srv = New-Object ('Microsoft.SqlServer.Management.SMO.Server') $server
+            if ($srv.AvailabilityGroups[$AGName].AvailabilityDatabases.Name.contains($DBName))
+            {
+            $Result = $True
+            }
+            else
+            {
+            $Result = $false
+            }
+        Return $Result
+        }
+       
+       }
+
+        Script AddDBsToAG {
+
+                GetScript = {
+            return @{
+                    GetScript = $GetScript
+                    SetScript = $SetScript
+                    TestScript = $TestScript
+                    Result = ""
+                    }
+                    }
+                SetScript = {
+                <# 
+.SYNOPSIS 
+
+Adds  database to the  Availability Group 
+
+.DESCRIPTION 
+This script adds the  database to the Avaialbility group 
+.INPUTS 
+None 
+.OUTPUTS 
+.EXAMPLE 
+
+.NAME 
+
+.AUTHOR 
+Rob Sewell http://qldbawiththebeard.com
+.DATE
+15/01/2015
+#>
+[void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.Management.Common" );  
+[void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.SmoEnum" );
+[void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.Smo" );
+[void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.SmoExtended " );
+[void][System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.ConnectionInfo") 
+[string]$PrimaryInstance = $Using:Node.SqlServerInstance
+[string]$SecondaryInstance = $Using:Node.Node2Name   
+[string]$TertiaryInstance = $Using:Node.Node3Name
+[string]$DBName = $Using:Node.AGDatabase
+[string]$BackupShare = $Using:Node.BackupShare
+[string]$EndPort = $Using:Node.ListenerPort
+[string]$AGName = $Using:Node.AvailabilityGroup
+[string]$EPName = $Using:Node.EndpointName
+[string]$ListIPSubnet = $Using:Node.ListenerIP
+[int]$ListPort = '1433'
+[string]$ListenerName = $Using:Node.ListenerName
+$DBs = $Using:DatabaseNames
+foreach ($DB in $DBs)
+{
+$DBName = $DB
+
+$PriPath = 'SQLSERVER:\SQL\' + $PrimaryInstance + '\DEFAULT\AvailabilityGroups\' + $AGName
+$SecPath = 'SQLSERVER:\SQL\' + $SecondarYInstance + '\DEFAULT\AvailabilityGroups\' + $AGName
+$TerPath = 'SQLSERVER:\SQL\' + $TertiaryInstance + '\DEFAULT\AvailabilityGroups\' + $AGName
+
+$LogBackupFile = $BackupShare + $DBName + '_ForAG.trn'
+$FullBackupFile = $BackupShare + $DBName + '_ForAG.bak' 
+
+# Backup my database and its log on the primary
+Backup-SqlDatabase -Database $DBName -BackupFile $FullBackupFile -ServerInstance $PrimaryInstance -ErrorAction Stop
+Backup-SqlDatabase -Database $DBName -BackupFile $LogBackupFile  -ServerInstance $PrimaryInstance -BackupAction Log -ErrorAction Stop 
+
+# Restore the database and log on the secondary (using NO RECOVERY)
+Restore-SqlDatabase -Database $DBName -BackupFile $FullBackupFile -ServerInstance $SecondaryInstance -NoRecovery -ErrorAction Stop
+Restore-SqlDatabase -Database $DBName -BackupFile $LogBackupFile  -ServerInstance $SecondaryInstance -RestoreAction Log -NoRecovery -ErrorAction Stop
+# Restore the database and log on the secondary (using NO RECOVERY)
+Restore-SqlDatabase -Database $DBName -BackupFile $FullBackupFile -ServerInstance $TertiaryInstance -NoRecovery -ErrorAction Stop
+Restore-SqlDatabase -Database $DBName -BackupFile $LogBackupFile  -ServerInstance $TertiaryInstance -RestoreAction Log -NoRecovery -ErrorAction Stop
+
+# Join the database to the availability group.
+Add-SqlAvailabilityDatabase -Path $PriPath -Database $DBName -ErrorAction Stop
+Add-SqlAvailabilityDatabase -Path $SecPath -Database $DBName -ErrorAction Stop
+Add-SqlAvailabilityDatabase -Path $TerPath -Database $DBName -ErrorAction Stop
+}
+                }
+                TestScript = {    
+            [void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.Management.Common" );
+            [void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.SmoEnum" );
+            [void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.Smo" );
+            [void][reflection.assembly]::LoadWithPartialName( "Microsoft.SqlServer.SmoExtended " );
+            [void][System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.ConnectionInfo") 
+            [String]$Server = $Using:Node.SqlServerInstance
+            [string]$AGName = $Using:Node.AvailabilityGroup
+            $DBs = $Using:DatabaseNames
+                foreach ($DB in $DBs)
+                {
+                $DBName = $DB
+            $Result = $True
+            $srv = New-Object ('Microsoft.SqlServer.Management.SMO.Server') $server
+            if ($srv.AvailabilityGroups[$AGName].AvailabilityDatabases.Name.contains($DBName))
+            {
+            $Result = $True
+            }
+            else
+            {
+            $Result = $false
+            Break
+            }
+            }
+        Return $Result
+            }
+        }
+
+
+   }   
